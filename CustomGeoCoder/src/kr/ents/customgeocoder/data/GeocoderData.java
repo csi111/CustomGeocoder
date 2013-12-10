@@ -5,7 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class GeoCoderData {
+public class GeocoderData {
 	private List<AddressComponents> addressComponentsDatas; 
 	private String formatted_address;
 	private LocationData location;
@@ -13,7 +13,7 @@ public class GeoCoderData {
 	private Map<String, LocationData> viewports;
 	private List<String> types;
 	
-	public GeoCoderData()
+	public GeocoderData()
 	{
 		addressComponentsDatas = new ArrayList<AddressComponents>();
 		viewports = new HashMap<String, LocationData>();
@@ -32,6 +32,33 @@ public class GeoCoderData {
 		}
 		addressComponentsDatas.add(data);
 	}
+	/**
+	 * get AddressComponent longnanme as same type
+	 * @param type
+	 * @return
+	 */
+	public String getAddressLongname(String type){
+		for(AddressComponents addrData : addressComponentsDatas){
+			if(addrData.hasTypes(type)) {
+				return addrData.getLong_name();
+			}
+		}
+		return null;	
+	}
+	/**
+	 * get AddressComponent shortnanme as same type
+	 * @param type
+	 * @return
+	 */
+	public String getAddressShortname(String type){
+		for(AddressComponents addrData : addressComponentsDatas){
+			if(addrData.hasTypes(type)) {
+				return addrData.getShort_name();
+			}
+		}
+		return null;	
+	}
+	
 	/**
 	 * add viewport
 	 * @param tag

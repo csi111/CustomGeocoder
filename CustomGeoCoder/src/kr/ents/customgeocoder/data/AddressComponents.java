@@ -7,7 +7,7 @@ public class AddressComponents {
 
 	private String mLong_name;
 	private String mShort_name;
-	public List<String> mTypes;
+	private List<String> mTypes;
 	
 	/**
 	 * Add Type
@@ -23,19 +23,27 @@ public class AddressComponents {
 	}
 	
 	/**
-	 * case type 
-	 * 0 : long_name
-	 * etc : short_name
+	 * return Long_name if types contains type
 	 * @param type
 	 * @return
 	 */
-	public String getName(int type)
+	public String getLong_name(String type)
 	{
-		if(type == 0){
+		if(mTypes.contains(type)){
 			return mLong_name;
 		}
 		else{
+			return null;
+		}
+	}
+	
+	public String getShort_name(String type)
+	{
+		if(mTypes.contains(type)){
 			return mShort_name;
+		}
+		else{
+			return null;
 		}
 	}
 
@@ -63,6 +71,10 @@ public class AddressComponents {
 		this.mTypes = types;
 	}
 	
+	public boolean hasTypes(String type)
+	{
+		return mTypes.contains(type) ? true : false;
+	}
 	
 
 }
