@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import kr.ents.customgeocoder.Geocoder.Mode;
 import kr.ents.customgeocoder.config.Constants;
 import kr.ents.customgeocoder.data.AddressComponents;
 import kr.ents.customgeocoder.data.GeocoderData;
@@ -25,9 +26,10 @@ import org.json.JSONObject;
 import android.content.Context;
 import android.location.Address;
 import android.os.AsyncTask;
+import android.os.Handler;
 import android.text.TextUtils;
 
-public class GeocoderWorker {
+public class GeocoderWorker<T> {
 	
 	private final String ADDRESS = "address";
 	private final String LAT_LNG = "latlng";
@@ -38,12 +40,61 @@ public class GeocoderWorker {
 	private Context mContext;
 	private String 	mUrl;
 	private Locale	mLocale;
-	private int mMaxResult;
+	private Mode	mMode;
+	private int 	mMaxResult;
+	private Handler mHandler;
 	
 	private GeocoderCallbackListener mListener;
 	
 	public GeocoderWorker(Context context){
-		mContext = context;
+		this(context, Mode.NO_ASYNC, Locale.getDefault());
+		
+	}
+	
+	public GeocoderWorker(Context context, Mode mode, Locale locale){
+		mLocale = locale;
+		mMode = mode;
+		mMaxResult = 1;
+	}
+	
+	public Mode getMode(){
+		return mMode;
+	}
+		
+	public void execute(T data, List<Address> addr)
+	{	//TODO Execute get geocoder data
+		setUrl(data);
+		
+		switch(mMode)
+		{
+			case NO_ASYNC:
+				addr = getAddressList();
+				break;
+			case ASYNC_TASK:
+				
+				break;
+			case ASYNC_HANDLER:
+				
+				break;
+		}
+	
+	}
+		
+	public void cancel()
+	{
+		//TODO Handler post Running cancel && Network Cancel
+	}
+	
+	public void setUrl(T data)
+	{
+		if(data instanceof LocationData)
+		{
+			setUrl(((LocationData) data).getLatitude(), ((LocationData) data).getLongitude());
+		}
+		else if(data instanceof String)
+		{
+			setUrl(data.toString());
+		}
 	}
 	
 	/**
@@ -79,6 +130,8 @@ public class GeocoderWorker {
 		} catch (UnsupportedEncodingException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+			mListener.onError("couldn't get URL");
+			
 		}
 		mUrl = strBuffer.toString();
 	}
@@ -142,6 +195,7 @@ public class GeocoderWorker {
 				}
 				else {
 					//TODO Failed correspond Network
+					mListener.onError("Failed connect");
 					return null;
 				}
 			}
@@ -151,12 +205,15 @@ public class GeocoderWorker {
 			}
 		} catch (MalformedURLException e) {
 			e.printStackTrace();
+			mListener.onError("Failed connect");
 			return null;
 		}catch (ProtocolException e) {
 			e.printStackTrace();
+			mListener.onError("Failed connect");
 			return null;
 		}catch (IOException e) {
 			e.printStackTrace();
+			mListener.onError("Failed connect");
 			return null;
 		}
 	}
@@ -244,6 +301,7 @@ public class GeocoderWorker {
 		catch(Exception e)
 		{
 			e.printStackTrace();
+			mListener.onError("Failed create data");
 			return null;
 		}	
 	}
@@ -291,6 +349,28 @@ public class GeocoderWorker {
 		return addrs;
 	}
 	
+	private class Connection implements Runnable
+	{
+		ArrayList<GeocoderData> reGeocodeDataList;
+		int what;
+		int maxLength;
+		
+		public Connection(int what, int maxLength)
+		{
+			this.what = what;
+			this.maxLength = maxLength;
+		}		
+		
+		@Override
+		public void run() 
+		{
+			// TODO Auto-generated method stub
+			List<Address> addrs = getAddressList();
+			
+			mListener.onCallback(addrs);
+		}
+	}
+	
 	private class GetLocationTask extends AsyncTask<Integer, Integer, Object>
 	{
 		@Override
@@ -330,9 +410,16 @@ public class GeocoderWorker {
 			}
 		}
 	}
+
+	protected void setMaxResult(int result)
+	{
+		mMaxResult = result;
+	}
 	
-	private void setLocationListener(GeocoderCallbackListener listener)
+	protected void setLocationListener(GeocoderCallbackListener listener)
 	{
 		this.mListener = listener;
 	}
+	
+		
 }

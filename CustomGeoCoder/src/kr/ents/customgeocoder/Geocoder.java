@@ -1,10 +1,14 @@
 package kr.ents.customgeocoder;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import kr.ents.customgeocoder.data.LocationData;
 import android.content.Context;
 import android.location.Address;
+import android.util.Log;
 
 public class Geocoder {
 
@@ -12,10 +16,14 @@ public class Geocoder {
 	private Locale mLocale;
 	private Mode mMode;
 	
-	public Geocoder(Context context, Locale locale) {
-		mContext = context;
-		mLocale = locale;
-		mMode = Mode.NO_ASYNC;
+
+
+	public Geocoder(Context context) {
+		this(context, Locale.getDefault(), Mode.NO_ASYNC);
+	}
+	
+	public Geocoder(Context context, Locale locale){
+		this(context, locale, Mode.NO_ASYNC);
 	}
 	
 	public Geocoder(Context context, Locale locale, Mode mode){
@@ -24,24 +32,57 @@ public class Geocoder {
 		mMode = mode;
 	}
 	
-	public Geocoder(Context context){
-		mContext = context;
-		mLocale = Locale.getDefault();
-		mMode = Mode.NO_ASYNC;
-	}
 	
-
 	public List<Address> getFromLocation(double latitude, double longitude, int maxResults) {
 		//TODO getFromLocation
-		return null;
+		
+		android.location.Geocoder geocoder = new android.location.Geocoder(mContext);
+		List<Address> addrs = new ArrayList<Address>();
+		try{
+			addrs = geocoder.getFromLocation(latitude, longitude, maxResults);
+			addrs = null;
+		}
+		catch(IOException e)
+		{
+			e.printStackTrace();
+			addrs = null;
+		}
+		addrs = null;
+		if(addrs == null){
+			Log.d("TEST" , "get Address");
+			GeocoderWorker worker = new GeocoderWorker(mContext, mMode, mLocale);
+			worker.setMaxResult(maxResults);
+			worker.execute(new LocationData(latitude, longitude), addrs);
+		}
+			
+		
+		return addrs;
 	}
 	
 	
 	public List<Address> getFromLocationName(String locationName, int maxResults) {
 		//TODO getFromLocationName
-		return null;
+		android.location.Geocoder geocoder = new android.location.Geocoder(mContext);
+		List<Address> addrs = new ArrayList<Address>();
+		try{
+			addrs = geocoder.getFromLocationName(locationName, maxResults);
+		}
+		catch(IOException e)
+		{
+			e.printStackTrace();
+			addrs = null;
+		}
+		addrs = null;
+		if(addrs == null){
+			Log.d("TEST" , "get Address");
+			GeocoderWorker worker = new GeocoderWorker(mContext, mMode, mLocale);
+			worker.setMaxResult(maxResults);
+			worker.execute(locationName, addrs);
+			
+		}
+		
+		return addrs;
 	}
-	
 	
 	/**
 	 * @param mode
@@ -50,7 +91,7 @@ public class Geocoder {
 		mMode = mode;
 	}
 	
-	public enum Mode{
+	public static enum Mode{
 		NO_ASYNC,
 		ASYNC_TASK,
 		ASYNC_HANDLER
