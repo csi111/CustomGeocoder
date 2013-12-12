@@ -15,18 +15,18 @@ import java.util.List;
 import java.util.Locale;
 
 import kr.ents.customgeocoder.Geocoder.Mode;
+import kr.ents.customgeocoder.config.Config;
 import kr.ents.customgeocoder.config.Constants;
 import kr.ents.customgeocoder.data.AddressComponents;
 import kr.ents.customgeocoder.data.GeocoderData;
 import kr.ents.customgeocoder.data.LocationData;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import android.content.Context;
 import android.location.Address;
-import android.os.AsyncTask;
-import android.os.Handler;
 import android.text.TextUtils;
 
 public class GeocoderWorker<T> {
@@ -42,12 +42,14 @@ public class GeocoderWorker<T> {
 	private Locale	mLocale;
 	private Mode	mMode;
 	private int 	mMaxResult;
-	private Thread xThread;
+	
+
+	private GetLocationThread xThread;
 	
 	private GeocoderCallbackListener mListener;
 	
 	public GeocoderWorker(Context context){
-		this(context, Mode.NO_ASYNC, Locale.getDefault());
+		this(context, Mode.ASYNC_HANDLER, Locale.getDefault());
 		
 	}
 	
@@ -58,30 +60,33 @@ public class GeocoderWorker<T> {
 	}
 	
 	public Mode getMode(){
+		cancel();
 		return mMode;
 	}
 		
 	public List<T> execute(T data)
 	{	//TODO Execute get geocoder data
 		setUrl(data);
-		List<Address> addrs = new ArrayList<Address>();
+		List<T> addrs = (List<T>) new ArrayList<Address>();
 		switch(mMode)
 		{
 			case NO_ASYNC:
 				addrs = getAddressList();
+				if(mListener != null)
+					mListener.onCallback(addrs);
 				break;
 			case ASYNC_HANDLER:
-				GcDataThread thread = new GcDataThread();
-				thread.start();
+				xThread = new GetLocationThread();
+				xThread.start();
 				
 				try{
-					thread.join();
+					xThread.join();
+					addrs = xThread.getResult();
 				}
 				catch(InterruptedException e){
-					e.printStackTrace();
-				}
-				
-				addrs = thread.getResult();
+					mListener.onError(999, e.getMessage());
+					addrs = null;
+				}		
 				break;
 		}
 		return (List<T>) addrs;
@@ -90,8 +95,12 @@ public class GeocoderWorker<T> {
 		
 	public void cancel()
 	{
-		//TODO Handler post Running cancel && Network Cancel
+		//TODO Thread Running cancel && Network Cancel
+		if(xThread != null && xThread.isAlive()){
+			xThread.quit();
+		}
 	}
+	
 	
 	public void setUrl(T data)
 	{
@@ -117,8 +126,7 @@ public class GeocoderWorker<T> {
 				.append(GeocoderUtil.setParam(LANGUAGE, mLocale.toString(), false));
 			} catch (UnsupportedEncodingException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
-				mListener.onError(999, "couldn't get URL");
+				mListener.onError(Config.ENCODING_ERROR, e.getMessage());
 			}
 		}
 		mUrl = strBuffer.toString();
@@ -162,7 +170,7 @@ public class GeocoderWorker<T> {
 				}
 				else {
 					//TODO Failed correspond Network
-					mListener.onError(999,"Failed connect");
+					mListener.onError(HttpURLConnection.HTTP_NOT_FOUND, "Failed correspond network");
 					return null;
 				}
 			}
@@ -172,15 +180,15 @@ public class GeocoderWorker<T> {
 			}
 		} catch (MalformedURLException e) {
 			e.printStackTrace();
-			mListener.onError(999,"Failed connect");
+			mListener.onError(HttpURLConnection.HTTP_BAD_REQUEST,e.getMessage());
 			return null;
 		}catch (ProtocolException e) {
 			e.printStackTrace();
-			mListener.onError(999, "Failed connect");
+			mListener.onError(HttpURLConnection.HTTP_BAD_REQUEST, e.getMessage());
 			return null;
 		}catch (IOException e) {
 			e.printStackTrace();
-			mListener.onError(999, "Failed connect");
+			mListener.onError(Config.HTTP_ERROR_ETC, e.getMessage());
 			return null;
 		}
 	}
@@ -265,19 +273,23 @@ public class GeocoderWorker<T> {
 			
 			return DataList;
 		}
+		catch(JSONException e)
+		{
+			mListener.onError(Config.PARSER_ERORR, e.getMessage());
+			return null;
+		}
 		catch(Exception e)
 		{
-			e.printStackTrace();
-			mListener.onError(888, "Failed create data");
+			mListener.onError(Config.BASIC_ERROR, e.getMessage());
 			return null;
-		}	
+		}
 	}
 	
 	/**
 	 * return AddressList from Location
 	 * @return List<Address>
 	 */
-	private List<Address> getAddressList()
+	private List<T> getAddressList()
 	{
 		
 		String jsonData;
@@ -310,93 +322,58 @@ public class GeocoderWorker<T> {
 				
 				addrs.add(addr);
 			}
-			
 		}
 			
-		return addrs;
+		return (List<T>) addrs;
 	}
 	
-	private class GcDataThread extends Thread {
+	private class GetLocationThread extends Thread {
 		
-		private List<Address> resultData;
+		private volatile boolean mQuit = false;
+		
+		private List<T> resultData;
 		
 		public void quit() {
+			mQuit = true;
 			interrupt();
 		}
 		  
 		@Override
 		public void run() {
-		  resultData = getAddressList(); 
+			
+			if(mQuit){
+				return;
+			}
+
+			resultData = getAddressList(); 
+			if(mListener != null){
+				mListener.onCallback(resultData);
+			}
+			
 		}
-		
-		public List<Address> getResult()
+		public List<T> getResult()
 		{
 			return resultData;
 		}
 	}
 	
-	private class Connection implements Runnable
-	{
-		public Connection(){
-
-		}		
-		
-		@Override
-		public void run() 
-		{
-			// TODO Auto-generated method stub
-			List<Address> addrs = getAddressList();
-			mListener.onCallback(addrs);
-		}
-	}
-	
-	private class GetLocationTask extends AsyncTask<Integer, Integer, Object>
-	{
-		@Override
-		protected void onPreExecute()
-		{
-			
-		}
-		
-		@Override
-		protected Object doInBackground(Integer... Params) {
-			// TODO Auto-generated method stub
-//			reGeocodeDataList  = getReverseCoderDataList();
-//			List<Address> addrs = new ArrayList<Address>();
-//			if(reGeocodeDataList != null & !reGeocodeDataList.isEmpty())
-//			{
-//				for(int idx = 0 ; idx < (Params[0] < reGeocodeDataList.size() ? Params[0] : reGeocodeDataList.size()); idx++)
-//				{
-//					Address addr = new Address(Locale.getDefault());
-//					
-//					addr.setAddressLine(0, reGeocodeDataList.get(idx).formatted_address);
-//					addr.setLatitude(Double.parseDouble(reGeocodeDataList.get(idx).location.latitude));
-//					addr.setLongitude(Double.parseDouble(reGeocodeDataList.get(idx).location.longitude));
-//					addrs.add(addr);
-//				}
-//			}
-			
-			return null;
-//			return addrs;
-		}
-		
-		@Override
-		protected void onPostExecute (Object result)
-		{
-			if(mListener != null)
-			{
-				mListener.onCallback(result);
-			}
-		}
-	}
-
+	/**
+	 * Set max result data size
+	 * @param result
+	 */
 	protected void setMaxResult(int result)
 	{
+		cancel();
 		mMaxResult = result;
 	}
 	
+	/**
+	 * Set callback Listener
+	 * @param listener
+	 */
 	protected void setLocationListener(GeocoderCallbackListener listener)
 	{
+		cancel();
 		this.mListener = listener;
 	}
 	

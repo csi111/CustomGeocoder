@@ -8,7 +8,6 @@ import java.util.Locale;
 import kr.ents.customgeocoder.data.LocationData;
 import android.content.Context;
 import android.location.Address;
-import android.util.Log;
 
 public class Geocoder {
 
@@ -16,20 +15,23 @@ public class Geocoder {
 	private Locale mLocale;
 	private Mode mMode;
 	
+	private GeocoderCallbackListener mListener;
 
-
+	private GeocoderWorker mWorker;
+	
 	public Geocoder(Context context) {
-		this(context, Locale.getDefault(), Mode.NO_ASYNC);
+		this(context, Locale.getDefault(), Mode.ASYNC_HANDLER);
 	}
 	
 	public Geocoder(Context context, Locale locale){
-		this(context, locale, Mode.NO_ASYNC);
+		this(context, locale, Mode.ASYNC_HANDLER);
 	}
 	
 	public Geocoder(Context context, Locale locale, Mode mode){
 		mContext = context;
 		mLocale = locale;
 		mMode = mode;
+		mWorker = new GeocoderWorker(mContext);
 	}
 	
 	
@@ -47,12 +49,11 @@ public class Geocoder {
 			e.printStackTrace();
 			addrs = null;
 		}
-		addrs = null;
 		if(addrs == null){
-			Log.d("TEST" , "get Address");
-			GeocoderWorker worker = new GeocoderWorker(mContext, mMode, mLocale);
-			worker.setMaxResult(maxResults);
-			addrs = worker.execute(new LocationData(latitude, longitude));
+			mWorker = new GeocoderWorker(mContext, mMode, mLocale);
+			mWorker.setMaxResult(maxResults);
+			mWorker.setLocationListener(mListener);
+			addrs = mWorker.execute(new LocationData(latitude, longitude));
 			
 		}
 			
@@ -73,17 +74,31 @@ public class Geocoder {
 			e.printStackTrace();
 			addrs = null;
 		}
-		addrs = null;
 		if(addrs == null){
-			Log.d("TEST" , "get Address");
-			GeocoderWorker worker = new GeocoderWorker(mContext, mMode, mLocale);
-			worker.setMaxResult(maxResults);
-			addrs = worker.execute(locationName);
+			mWorker = new GeocoderWorker(mContext, mMode, mLocale);
+			mWorker.setMaxResult(maxResults);
+			mWorker.setLocationListener(mListener);
+			addrs = mWorker.execute(locationName);
 			
 		}
 		
 		return addrs;
 	}
+	
+	public void clear(){
+		
+		mWorker.cancel();
+		mWorker = null;
+		mLocale = null;
+		mListener = null;
+		mMode = null;
+		System.gc();
+	}
+	
+	public void setCallbackListener(GeocoderCallbackListener listener){
+		mListener = listener;
+	}
+	
 	
 	/**
 	 * @param mode

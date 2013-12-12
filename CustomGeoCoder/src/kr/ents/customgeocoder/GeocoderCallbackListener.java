@@ -1,7 +1,7 @@
 package kr.ents.customgeocoder;
 
-public interface GeocoderCallbackListener<T> {
-	public void onCallback(T result);
+public interface GeocoderCallbackListener {
+	public void onCallback(Object result);
 	public void onError(int resultCode, String error);
 	
 }
