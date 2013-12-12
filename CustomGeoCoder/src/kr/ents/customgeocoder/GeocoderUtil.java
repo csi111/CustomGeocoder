@@ -47,9 +47,36 @@ public class GeocoderUtil {
 	 */
 	public static boolean getGPSEnabled(Context context)
 	{
-		LocationManager myLocationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-		boolean isGpsEnabled = myLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+		if(context != null)
+		{
+			LocationManager myLocationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+			boolean isGpsEnabled = myLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+			return isGpsEnabled;
+		}
+		return false;
 		
-		return isGpsEnabled;
 	}
+	
+	/**
+	 * settting Parameter 
+	 * @param tag
+	 * @param value
+	 * @param isFirst
+	 * @return
+	 */
+	public static String setParam(String tag, String value, boolean isFirst)
+	{
+		StringBuffer strBuffer = new StringBuffer();
+		
+		if(isFirst){
+			strBuffer.append("?");
+		}
+		else{
+			strBuffer.append("&");
+		}
+		
+		strBuffer.append(tag).append("=").append(value);
+		return strBuffer.toString();
+	}
+	
 }

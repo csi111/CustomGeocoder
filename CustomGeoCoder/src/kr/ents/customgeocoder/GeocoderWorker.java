@@ -42,7 +42,7 @@ public class GeocoderWorker<T> {
 	private Locale	mLocale;
 	private Mode	mMode;
 	private int 	mMaxResult;
-	private Handler mHandler;
+	private Thread xThread;
 	
 	private GeocoderCallbackListener mListener;
 	
@@ -61,22 +61,30 @@ public class GeocoderWorker<T> {
 		return mMode;
 	}
 		
-	public void execute(T data, List<Address> addr)
+	public List<T> execute(T data)
 	{	//TODO Execute get geocoder data
 		setUrl(data);
-		
+		List<Address> addrs = new ArrayList<Address>();
 		switch(mMode)
 		{
 			case NO_ASYNC:
-				addr = getAddressList();
-				break;
-			case ASYNC_TASK:
-				
+				addrs = getAddressList();
 				break;
 			case ASYNC_HANDLER:
+				GcDataThread thread = new GcDataThread();
+				thread.start();
 				
+				try{
+					thread.join();
+				}
+				catch(InterruptedException e){
+					e.printStackTrace();
+				}
+				
+				addrs = thread.getResult();
 				break;
 		}
+		return (List<T>) addrs;
 	
 	}
 		
@@ -87,76 +95,35 @@ public class GeocoderWorker<T> {
 	
 	public void setUrl(T data)
 	{
+		StringBuffer strBuffer = new StringBuffer();
 		if(data instanceof LocationData)
 		{
-			setUrl(((LocationData) data).getLatitude(), ((LocationData) data).getLongitude());
+			strBuffer.append(Constants.PREFIX_URL)
+			.append(GeocoderUtil.setParam(LAT_LNG, 
+					((LocationData) data).getLatitude()+","
+					+((LocationData) data).getLongitude(), true))
+			.append(GeocoderUtil.setParam(SENSOR, 
+					String.valueOf(GeocoderUtil.getGPSEnabled(mContext)), false))
+			.append(GeocoderUtil.setParam(LANGUAGE, mLocale.toString(), false));
 		}
 		else if(data instanceof String)
 		{
-			setUrl(data.toString());
-		}
-	}
-	
-	/**
-	 * set URL
-	 * @param latitude
-	 * @param longtitude
-	 */
-	private void setUrl(double latitude, double longtitude)
-	{
-		StringBuffer strBuffer = new StringBuffer();
-
-		strBuffer.append(Constants.PREFIX_URL)
-		.append(setParam(LAT_LNG, latitude+","+longtitude, true))
-		.append(setParam(SENSOR, String.valueOf(GeocoderUtil.getGPSEnabled(mContext)), false))
-		.append(setParam(LANGUAGE, mLocale.getCountry(), false));
-		
-		mUrl = strBuffer.toString();
-	}
-	
-	/**
-	 * set URL
-	 * @param location
-	 */
-	private void setUrl(String location)
-	{
-		StringBuffer strBuffer = new StringBuffer();
-
-		try {
-			strBuffer.append(Constants.PREFIX_URL)
-			.append(setParam(ADDRESS, URLEncoder.encode(location, "UTF-8"), true))
-			.append(setParam(SENSOR, String.valueOf(GeocoderUtil.getGPSEnabled(mContext)), false))
-			.append(setParam(LANGUAGE, mLocale.getCountry(), false));
-		} catch (UnsupportedEncodingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-			mListener.onError("couldn't get URL");
-			
+			try {
+				strBuffer.append(Constants.PREFIX_URL)
+				.append(GeocoderUtil.setParam(ADDRESS, 
+						URLEncoder.encode(data.toString(), "UTF-8"), true))
+				.append(GeocoderUtil.setParam(SENSOR, 
+						String.valueOf(GeocoderUtil.getGPSEnabled(mContext)), false))
+				.append(GeocoderUtil.setParam(LANGUAGE, mLocale.toString(), false));
+			} catch (UnsupportedEncodingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				mListener.onError(999, "couldn't get URL");
+			}
 		}
 		mUrl = strBuffer.toString();
 	}
 	
-	/**
-	 * settting Parameter 
-	 * @param tag
-	 * @param value
-	 * @param isFirst
-	 * @return
-	 */
-	private String setParam(String tag, String value, boolean isFirst)
-	{
-		StringBuffer strBuffer = new StringBuffer();
-		
-		if(isFirst){
-			strBuffer.append("?");
-		}
-		else{
-			strBuffer.append("&");
-		}
-		
-		strBuffer.append(tag).append("=").append(value);
-		return strBuffer.toString();
-	}
 	
 	/**
 	 * correspond Google Map Geocoder API
@@ -195,7 +162,7 @@ public class GeocoderWorker<T> {
 				}
 				else {
 					//TODO Failed correspond Network
-					mListener.onError("Failed connect");
+					mListener.onError(999,"Failed connect");
 					return null;
 				}
 			}
@@ -205,15 +172,15 @@ public class GeocoderWorker<T> {
 			}
 		} catch (MalformedURLException e) {
 			e.printStackTrace();
-			mListener.onError("Failed connect");
+			mListener.onError(999,"Failed connect");
 			return null;
 		}catch (ProtocolException e) {
 			e.printStackTrace();
-			mListener.onError("Failed connect");
+			mListener.onError(999, "Failed connect");
 			return null;
 		}catch (IOException e) {
 			e.printStackTrace();
-			mListener.onError("Failed connect");
+			mListener.onError(999, "Failed connect");
 			return null;
 		}
 	}
@@ -301,7 +268,7 @@ public class GeocoderWorker<T> {
 		catch(Exception e)
 		{
 			e.printStackTrace();
-			mListener.onError("Failed create data");
+			mListener.onError(888, "Failed create data");
 			return null;
 		}	
 	}
@@ -349,16 +316,29 @@ public class GeocoderWorker<T> {
 		return addrs;
 	}
 	
+	private class GcDataThread extends Thread {
+		
+		private List<Address> resultData;
+		
+		public void quit() {
+			interrupt();
+		}
+		  
+		@Override
+		public void run() {
+		  resultData = getAddressList(); 
+		}
+		
+		public List<Address> getResult()
+		{
+			return resultData;
+		}
+	}
+	
 	private class Connection implements Runnable
 	{
-		ArrayList<GeocoderData> reGeocodeDataList;
-		int what;
-		int maxLength;
-		
-		public Connection(int what, int maxLength)
-		{
-			this.what = what;
-			this.maxLength = maxLength;
+		public Connection(){
+
 		}		
 		
 		@Override
@@ -366,7 +346,6 @@ public class GeocoderWorker<T> {
 		{
 			// TODO Auto-generated method stub
 			List<Address> addrs = getAddressList();
-			
 			mListener.onCallback(addrs);
 		}
 	}

@@ -52,7 +52,8 @@ public class Geocoder {
 			Log.d("TEST" , "get Address");
 			GeocoderWorker worker = new GeocoderWorker(mContext, mMode, mLocale);
 			worker.setMaxResult(maxResults);
-			worker.execute(new LocationData(latitude, longitude), addrs);
+			addrs = worker.execute(new LocationData(latitude, longitude));
+			
 		}
 			
 		
@@ -77,7 +78,7 @@ public class Geocoder {
 			Log.d("TEST" , "get Address");
 			GeocoderWorker worker = new GeocoderWorker(mContext, mMode, mLocale);
 			worker.setMaxResult(maxResults);
-			worker.execute(locationName, addrs);
+			addrs = worker.execute(locationName);
 			
 		}
 		
@@ -93,7 +94,6 @@ public class Geocoder {
 	
 	public static enum Mode{
 		NO_ASYNC,
-		ASYNC_TASK,
 		ASYNC_HANDLER
 	}
 }
